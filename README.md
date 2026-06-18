@@ -71,6 +71,39 @@ Input goes in via tmux paste; output comes out by reading the transcript JSONL
 By default the script looks for the `claude` binary at
 `~/.npm-global/bin/claude`. Override with the `CLAUDE_CLI_RUN_BIN` env var.
 
+## Install
+
+It's a single self-contained file — just put it on your `PATH`.
+
+```bash
+# 1. get the script
+git clone https://github.com/akihidem/claude-headless-via-tui.git
+cd claude-headless-via-tui
+chmod +x claude-cli-run.py
+
+# 2. put it on PATH as `claude-cli-run` (pick one)
+sudo ln -s "$PWD/claude-cli-run.py" /usr/local/bin/claude-cli-run   # system-wide
+# or, no sudo:
+mkdir -p ~/.local/bin && ln -s "$PWD/claude-cli-run.py" ~/.local/bin/claude-cli-run
+#   make sure ~/.local/bin is on your PATH:
+#   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+
+# 3. (optional) if `claude` is not at ~/.npm-global/bin/claude, tell the script:
+export CLAUDE_CLI_RUN_BIN="$(command -v claude)"
+
+# 4. verify
+claude-cli-run "say hi in one word"
+```
+
+Or grab just the file without cloning:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akihidem/claude-headless-via-tui/main/claude-cli-run.py \
+  -o ~/.local/bin/claude-cli-run && chmod +x ~/.local/bin/claude-cli-run
+```
+
+No `pip install` needed — standard library only.
+
 ## Usage
 
 ```
@@ -132,6 +165,39 @@ transcript JSONL を直読 → プロンプト末尾に注入した `CCRUN_DONE_
 
 Claude Code（`claude` バイナリ）/ `tmux` / Python 3.8+（標準ライブラリのみ）。
 `claude` のパスは既定 `~/.npm-global/bin/claude`、`CLAUDE_CLI_RUN_BIN` で上書き可。
+
+### インストール
+
+単一ファイルなので `PATH` に置くだけ。
+
+```bash
+# 1. 取得
+git clone https://github.com/akihidem/claude-headless-via-tui.git
+cd claude-headless-via-tui
+chmod +x claude-cli-run.py
+
+# 2. PATH に claude-cli-run として置く（どちらか）
+sudo ln -s "$PWD/claude-cli-run.py" /usr/local/bin/claude-cli-run   # システム全体
+# sudo なしなら:
+mkdir -p ~/.local/bin && ln -s "$PWD/claude-cli-run.py" ~/.local/bin/claude-cli-run
+#   ~/.local/bin が PATH に入っているか確認:
+#   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+
+# 3. （任意）claude が ~/.npm-global/bin/claude に無いなら明示:
+export CLAUDE_CLI_RUN_BIN="$(command -v claude)"
+
+# 4. 動作確認
+claude-cli-run "一言で挨拶して"
+```
+
+clone せずファイルだけ取るなら:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akihidem/claude-headless-via-tui/main/claude-cli-run.py \
+  -o ~/.local/bin/claude-cli-run && chmod +x ~/.local/bin/claude-cli-run
+```
+
+`pip install` 不要（標準ライブラリのみ）。
 
 ## License
 
