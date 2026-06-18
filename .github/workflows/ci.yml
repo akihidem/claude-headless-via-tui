@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Byte-compile (syntax check)
+        run: python -m py_compile claude-cli-run.py
+
+      - name: Lint (real errors only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+          # E9: syntax/runtime, F63/F7: bad constructs, F82: undefined name
+          ruff check --select E9,F63,F7,F82 claude-cli-run.py
+
+      - name: Smoke test (--help works without claude/tmux)
+        run: python claude-cli-run.py --help

@@ -1,5 +1,6 @@
 # claude-headless-via-tui
 
+[![CI](https://github.com/akihidem/claude-headless-via-tui/actions/workflows/ci.yml/badge.svg)](https://github.com/akihidem/claude-headless-via-tui/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 ![Dependencies](https://img.shields.io/badge/dependencies-none%20(stdlib)-success.svg)
