@@ -1,5 +1,12 @@
 # claude-headless-via-tui
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+![Dependencies](https://img.shields.io/badge/dependencies-none%20(stdlib)-success.svg)
+![Requires](https://img.shields.io/badge/requires-Claude%20Code%20%2B%20tmux-orange.svg)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL-lightgrey.svg)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/akihidem/claude-headless-via-tui/pulls)
+
 A drop-in replacement for `claude -p "PROMPT"` (Claude Code headless mode) that
 runs the **interactive TUI** under the hood and drives it with tmux.
 
