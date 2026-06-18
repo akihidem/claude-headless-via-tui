@@ -25,9 +25,11 @@ Opts:
 終了コード: 成功 0 / 失敗 1 (理由は stderr)。
 """
 import argparse
+import atexit
 import datetime
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -48,6 +50,64 @@ ACCEPT_KEYWORDS = ("yes, i accept", "continue without", "yes, proceed",
 
 def tmux(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["tmux", *args], capture_output=True, text=True)
+
+
+# --- session cleanup (堅牢化) ---------------------------------------------
+# tmux セッションは -d (detached) なので親が落ちても生き続ける。通常終了は
+# run() の finally で kill するが、SIGINT/SIGKILL 等では finally が走らず孤児が
+# 残る。そこで (1) signal/atexit で best-effort に kill、(2) 起動時に「pid が
+# 既に死んでいる ccrun-* セッション」を掃除して自己修復する。
+_ACTIVE_SESSION = None  # 現在このプロセスが保持しているセッション名
+
+
+def _kill_active_session():
+    global _ACTIVE_SESSION
+    if _ACTIVE_SESSION:
+        tmux("kill-session", "-t", _ACTIVE_SESSION)
+        _ACTIVE_SESSION = None
+
+
+def _on_signal(signum, _frame):
+    _kill_active_session()
+    # 既定の終了コード規約 (128 + signum) で抜ける
+    sys.exit(128 + signum)
+
+
+def _install_cleanup_handlers():
+    atexit.register(_kill_active_session)
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        try:
+            signal.signal(sig, _on_signal)
+        except (ValueError, OSError):
+            pass  # メインスレッド以外等では無視
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # 別ユーザの生存プロセス
+    return True
+
+
+def reap_stale_sessions():
+    """所有プロセスが既に死んでいる ccrun-<pid>-<uuid> セッションを掃除する。"""
+    out = tmux("list-sessions", "-F", "#{session_name}")
+    if out.returncode != 0:
+        return 0
+    reaped = 0
+    for name in out.stdout.splitlines():
+        m = re.match(r"^ccrun-(\d+)-[0-9a-f]+$", name.strip())
+        if not m:
+            continue
+        pid = int(m.group(1))
+        if pid == os.getpid() or _pid_alive(pid):
+            continue  # 自分 / 別の生きてる実行のセッションは触らない
+        tmux("kill-session", "-t", name)
+        reaped += 1
+    return reaped
 
 
 def transcripts_dir(cwd: Path) -> Path:
@@ -181,6 +241,8 @@ def run(prompt: str, model, cwd: Path, perm: str, timeout: int,
                "-c", str(cwd), "bash", "-lc", inner)
     if new.returncode != 0:
         return None, f"tmux new-session 失敗: {new.stderr.strip()[:200]}"
+    global _ACTIVE_SESSION
+    _ACTIVE_SESSION = session  # signal/atexit ハンドラの掃除対象に登録
 
     try:
         ready, pane = wait_for_tui_ready(session, startup)
@@ -214,6 +276,7 @@ def run(prompt: str, model, cwd: Path, perm: str, timeout: int,
         return None, f"{timeout}s 内に assistant 応答なし"
     finally:
         tmux("kill-session", "-t", session)
+        _ACTIVE_SESSION = None
 
 
 def main():
@@ -225,7 +288,20 @@ def main():
     ap.add_argument("--timeout", type=int, default=300)
     ap.add_argument("--startup-timeout", type=int, default=40)
     ap.add_argument("--no-sentinel", action="store_true")
+    ap.add_argument("--reap", action="store_true",
+                    help="所有プロセスが死んだ ccrun-* セッションを掃除して終了")
+    ap.add_argument("--no-reap", action="store_true",
+                    help="起動時の自動掃除(stale 回収)を無効化")
     a = ap.parse_args()
+
+    if a.reap:
+        n = reap_stale_sessions()
+        print(f"[claude-cli-run] reaped {n} stale session(s)", file=sys.stderr)
+        sys.exit(0)
+
+    _install_cleanup_handlers()
+    if not a.no_reap:
+        reap_stale_sessions()  # 過去の強制終了で残った孤児を自己修復
 
     prompt = a.prompt if a.prompt is not None else sys.stdin.read()
     if not prompt.strip():

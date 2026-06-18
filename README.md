@@ -127,8 +127,25 @@ echo "$PROMPT" | claude-cli-run.py [opts]
 | `--timeout SEC` | `300` | max wait for the answer to complete |
 | `--startup-timeout SEC` | `40` | max wait for the TUI to come up |
 | `--no-sentinel` | off | don't append a sentinel; return the first assistant response (good for free-form output) |
+| `--reap` | — | kill any stale `ccrun-*` tmux sessions whose owning process is dead, then exit |
+| `--no-reap` | off | skip the automatic stale-session sweep done at startup |
 
 Exit code: `0` on success, `1` on failure (reason on stderr).
+
+### Session cleanup
+
+The tmux session is detached (`-d`), so it outlives the script. On normal exit
+it's killed in a `finally` block; on `SIGINT`/`SIGTERM`/`SIGHUP` a handler kills
+it too. But a hard kill (`SIGKILL`/OOM) skips all of that and leaves an orphan.
+
+To self-heal, every run first sweeps stale `ccrun-<pid>-*` sessions whose owning
+process no longer exists (disable with `--no-reap`). It only touches sessions
+whose pid is dead — concurrent runs and other tools' sessions are left alone. You
+can also sweep manually:
+
+```bash
+claude-cli-run --reap
+```
 
 ## Examples
 
