@@ -122,6 +122,94 @@ echo "$PROMPT" | claude-cli-run.py [opts]
 
 Exit code: `0` on success, `1` on failure (reason on stderr).
 
+## Examples
+
+### Basic — prompt in, answer out
+
+```bash
+claude-cli-run "What is the capital of Japan? Answer in one word."
+# -> Tokyo
+```
+
+### Pipe a prompt from stdin
+
+```bash
+echo "Summarize this in 3 bullet points:" | cat - article.txt | claude-cli-run
+# or build the prompt in a heredoc:
+claude-cli-run "$(cat <<'EOF'
+Review the diff below and list any bugs.
+
+$(git diff)
+EOF
+)"
+```
+
+### Pick a cheaper/faster model
+
+```bash
+claude-cli-run --model claude-haiku-4-5-20251001 "Classify this sentiment: 'I love it'"
+```
+
+### Capture the answer into a shell variable
+
+```bash
+TITLE=$(claude-cli-run "Suggest a concise git commit title for: added retry logic")
+git commit -m "$TITLE"
+```
+
+### Let it create / edit files in a real repo
+
+Point `--cwd` at the target repo (it runs with `bypassPermissions` by default,
+so it can use tools without asking):
+
+```bash
+claude-cli-run --cwd ~/myproject \
+  "Add a README.md with a one-paragraph description of this project."
+```
+
+### Read-only investigation (no file changes)
+
+```bash
+claude-cli-run --cwd ~/myproject --permission-mode plan \
+  "Where is the database connection configured? Just tell me the file and line."
+```
+
+### Free-form output (no completion sentinel)
+
+By default the tool asks the model to end with a hidden `CCRUN_DONE_xxxx` marker
+to detect completion. For creative / open-ended output where that instruction is
+unwanted, use `--no-sentinel` (returns the first assistant response):
+
+```bash
+claude-cli-run --no-sentinel "Write a haiku about tmux."
+```
+
+### Give a long-running task more time
+
+```bash
+claude-cli-run --timeout 900 --cwd ~/bigrepo \
+  "Refactor utils.py to remove duplicate code, then summarize what changed."
+```
+
+### Use it in a script / cron job
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+DIGEST=$(claude-cli-run --model claude-haiku-4-5-20251001 \
+  "In 5 bullets, summarize today's git log:\n$(git log --since=yesterday --oneline)")
+printf '%s\n' "$DIGEST" | mail -s "Daily repo digest" me@example.com
+```
+
+### Drop-in swap for existing `claude -p` automation
+
+Anywhere your scripts call `claude -p`, replace the command name:
+
+```diff
+- claude -p "$PROMPT"
++ claude-cli-run "$PROMPT"
+```
+
 ## Caveats
 
 - This automates UI flows and relies on TUI footer/menu strings; a future
@@ -198,6 +286,39 @@ curl -fsSL https://raw.githubusercontent.com/akihidem/claude-headless-via-tui/ma
 ```
 
 `pip install` 不要（標準ライブラリのみ）。
+
+### 使い方の例
+
+```bash
+# 基本: プロンプト → 回答
+claude-cli-run "日本の首都は? 一言で。"
+
+# stdin から渡す
+echo "次を3点で要約して:" | cat - article.txt | claude-cli-run
+
+# 安い/速いモデルを指定
+claude-cli-run --model claude-haiku-4-5-20251001 "この感情を分類して: 'I love it'"
+
+# 回答をシェル変数に取り込む
+TITLE=$(claude-cli-run "次の変更に合うコミットタイトルを簡潔に: リトライ処理を追加")
+git commit -m "$TITLE"
+
+# 実際の repo でファイルを生成・編集させる（既定 bypassPermissions なので確認なしで tool 実行）
+claude-cli-run --cwd ~/myproject "このプロジェクトを一段落で説明する README.md を追加して。"
+
+# 読み取り専用で調査（ファイル変更なし）
+claude-cli-run --cwd ~/myproject --permission-mode plan \
+  "DB接続はどこで設定してる? ファイルと行だけ教えて。"
+
+# 自由記述（完了 sentinel を付けない＝最初の応答を返す）
+claude-cli-run --no-sentinel "tmux についての俳句を1つ。"
+
+# 時間のかかるタスクに余裕を与える
+claude-cli-run --timeout 900 --cwd ~/bigrepo "utils.py の重複を除去して、変更点を要約して。"
+
+# 既存の `claude -p` 自動化の置き換え（コマンド名を差し替えるだけ）
+#   claude -p "$PROMPT"   →   claude-cli-run "$PROMPT"
+```
 
 ## License
 
