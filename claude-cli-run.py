@@ -40,8 +40,12 @@ from pathlib import Path
 CLAUDE_BIN = os.environ.get("CLAUDE_CLI_RUN_BIN") or str(Path.home() / ".npm-global" / "bin" / "claude")
 DEFAULT_CWD = Path.home() / ".claude" / "claude-cli-run-cwd"
 
-# 入力欄 ready の安定マーカー（フッター）
-READY_MARKERS = ("shift+tab to cycle", "? for shortcuts")
+# 入力欄 ready の安定マーカー（フッター/ヒント）。Claude Code の版でフッター文言が
+# 変わる（2.1.x で "shift+tab to cycle"/"? for shortcuts" が既定フッターから消え、
+# "← for agents" 等に置き換わった）ため複数候補を OR で見る。最終的には
+# _input_box_ready() で入力欄 "❯" 自体を ready 判定する（版差に最も強い）。
+READY_MARKERS = ("shift+tab to cycle", "? for shortcuts", "for shortcuts",
+                 "← for agents", "for agents", "esc to interrupt")
 MENU_CONFIRM_MARKER = "Enter to confirm"
 # 起動時メニューで安全に accept すべき選択肢のキーワード（優先順）
 ACCEPT_KEYWORDS = ("yes, i accept", "continue without", "yes, proceed",
@@ -187,6 +191,16 @@ def _handle_startup_menu(session: str, pane: str) -> bool:
     return True
 
 
+def _input_box_ready(pane: str) -> bool:
+    """REPL の入力欄 '❯' が出ていれば ready とみなす（フッター文言の版差に強い）。
+    起動メニューの '❯ 1. ...' 形式は除外する。"""
+    for ln in pane.splitlines():
+        s = ln.strip()
+        if s.startswith("❯") and not re.match(r"^❯\s*\d+\.", s):
+            return True
+    return False
+
+
 def wait_for_tui_ready(session: str, timeout: int):
     deadline = time.time() + timeout
     last = ""
@@ -196,7 +210,7 @@ def wait_for_tui_ready(session: str, timeout: int):
             if not _handle_startup_menu(session, last):
                 time.sleep(1)  # 未知メニュー: 触らず待つ
             continue
-        if any(m in last for m in READY_MARKERS):
+        if any(m in last for m in READY_MARKERS) or _input_box_ready(last):
             return True, last
         time.sleep(1)
     return False, last
